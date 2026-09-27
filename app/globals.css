@@ -1,0 +1,163 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+
+/*
+ * Knotted Studio design tokens.
+ * Change the brand palette here and every page follows.
+ *
+ * Semantic tokens (use these in components):
+ *   bg-background, text-foreground, bg-card, bg-muted, text-muted-foreground,
+ *   bg-primary / text-primary-foreground (espresso buttons),
+ *   bg-accent (subtle hover), border-border, ring-ring, text-destructive.
+ * Brand colours (for decorative touches):
+ *   clay, clay-light, sand, linen, oat, espresso, cream, taupe.
+ */
+
+@theme inline {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-fraunces), ui-serif, Georgia, serif;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-clay: #a45d3b;
+  --color-clay-light: #b86e4a;
+  --color-clay-dark: #7f452e;
+  --color-sand: #e7d9c9;
+  --color-linen: #efe6db;
+  --color-oat: #d8c9b8;
+  --color-espresso: #332720;
+  --color-cream: #f8f5ef;
+  --color-taupe: #71665c;
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  color-scheme: light;
+  --radius: 0.75rem;
+
+  --background: #f8f5ef;
+  --foreground: #2d2925;
+  --card: #fffdf9;
+  --card-foreground: #2d2925;
+  --popover: #fffdf9;
+  --popover-foreground: #2d2925;
+  --primary: #332720;
+  --primary-foreground: #f8f5ef;
+  --secondary: #e7d9c9;
+  --secondary-foreground: #332720;
+  --muted: #f1ebe3;
+  --muted-foreground: #6b6057;
+  --accent: #ebe5dc;
+  --accent-foreground: #332720;
+  --destructive: #b42318;
+  --success: #2f6b3a;
+  --warning: #9a6200;
+  --info: #2f5b8a;
+  --border: #ded8cf;
+  --input: #d2c9be;
+  --ring: #a45d3b;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-ring;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer utilities {
+  /* Small uppercase label above headings, e.g. "The collection". */
+  .eyebrow {
+    @apply text-[11px] font-semibold tracking-[0.25em] text-clay uppercase;
+  }
+
+  /* Rich text from product descriptions and legal pages. */
+  .prose-shop {
+    @apply max-w-none text-base leading-7 text-muted-foreground;
+  }
+
+  .prose-shop h2 {
+    @apply mt-10 mb-3 font-serif text-2xl tracking-tight text-foreground;
+  }
+
+  .prose-shop h3 {
+    @apply mt-6 mb-2 text-base font-semibold text-foreground;
+  }
+
+  .prose-shop p,
+  .prose-shop ul,
+  .prose-shop ol {
+    @apply mb-4;
+  }
+
+  .prose-shop ul {
+    @apply list-disc pl-5;
+  }
+
+  .prose-shop ol {
+    @apply list-decimal pl-5;
+  }
+
+  .prose-shop a {
+    @apply text-clay underline underline-offset-4;
+  }
+}
