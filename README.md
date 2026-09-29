@@ -15,7 +15,7 @@ and switches to Stripe Checkout automatically once Stripe keys are added.
 
 - Catalogue with search, category filters, sorting and pagination
 - Product pages with a photo gallery, variants (size, colour) and live stock levels
-- Bag stored in the browser, with a free-shipping meter and discount codes
+- Bag with a free-shipping meter and discount codes: kept in the browser for guests, saved to the account once signed in (a guest bag merges in at sign-in)
 - Checkout with **manual payments** (no Stripe needed) or **Stripe Checkout**
 - Customer accounts: sign-up with email confirmation, password reset, email change, order history with tracking
 - Wishlist and product reviews (moderated before they appear)

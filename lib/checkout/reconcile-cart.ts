@@ -83,3 +83,22 @@ export function reconcileCart(lines: CartLine[], variants: CartVariantInfo[], cu
 
   return { lines: nextLines, unavailableIds, notices, changed }
 }
+
+/**
+ * Combines the bag a shopper filled as a guest with the bag saved on their
+ * account, when they sign in. The same piece in both is added up, within the
+ * per-item and stock limits; a line never shrinks below what the account had.
+ */
+export function mergeCartLines(accountLines: CartLine[], guestLines: CartLine[]): CartLine[] {
+  const merged = new Map(accountLines.map((line) => [line.variantId, line]))
+  for (const guestLine of guestLines) {
+    const accountLine = merged.get(guestLine.variantId)
+    if (!accountLine) {
+      merged.set(guestLine.variantId, guestLine)
+      continue
+    }
+    const combined = Math.min(accountLine.quantity + guestLine.quantity, lineQuantityLimit(accountLine.maxQuantity))
+    merged.set(guestLine.variantId, { ...accountLine, quantity: Math.max(accountLine.quantity, combined) })
+  }
+  return [...merged.values()]
+}

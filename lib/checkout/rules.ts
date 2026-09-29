@@ -12,6 +12,9 @@ export const MAX_ORDER_NOTE_LENGTH = 1000
 /** Different items allowed in one order. */
 export const MAX_CHECKOUT_LINES = 50
 
+/** Different items kept in a signed-in shopper's saved bag. Roomier than an order, like the cart refresh. */
+export const MAX_SAVED_CART_LINES = MAX_CHECKOUT_LINES * 2
+
 /** ISO 3166-1 alpha-2 country code, as stored in `store_settings.allowed_shipping_countries`. */
 export const COUNTRY_CODE_PATTERN = /^[A-Z]{2}$/
 

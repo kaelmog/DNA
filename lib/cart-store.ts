@@ -2,6 +2,10 @@
  * The shopping cart, stored in the browser's localStorage so guests can shop
  * without an account. Components read it through the `useCart()` hook.
  *
+ * For a signed-in shopper the bag also belongs to their account: the store
+ * remembers which account (see CartAccount) and CartAccountSync copies every
+ * change to the database, so the bag follows the account, not the browser.
+ *
  * Prices stored here are only for display. The checkout server action always
  * re-reads prices and stock from the database.
  */
@@ -21,11 +25,22 @@ export interface CartLine {
   maxQuantity: number | null
 }
 
+/** The account a stored bag belongs to. No record means a guest bag. */
+export interface CartAccount {
+  userId: string
+  /** True while this browser has changes the account's saved bag does not have yet. */
+  unsaved: boolean
+}
+
 const STORAGE_KEY = 'knotted-cart-v1'
+const ACCOUNT_KEY = 'knotted-cart-account-v1'
 const EMPTY: CartLine[] = []
 
 let cachedLines: CartLine[] | null = null
+/** Fallback when localStorage is unavailable, so the account is still known for this page view. */
+let memoryAccount: CartAccount | null = null
 const listeners = new Set<() => void>()
+const shopperChangeListeners = new Set<() => void>()
 
 function clampQuantity(quantity: number, maxQuantity: number | null) {
   const limit = Math.min(MAX_CART_QUANTITY, maxQuantity ?? MAX_CART_QUANTITY)
@@ -56,12 +71,41 @@ function readLines(): CartLine[] {
   return cachedLines
 }
 
-function writeLines(lines: CartLine[]) {
+function readAccount(): CartAccount | null {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(ACCOUNT_KEY) ?? 'null') as Partial<CartAccount> | null
+    return parsed && typeof parsed.userId === 'string' ? { userId: parsed.userId, unsaved: parsed.unsaved === true } : null
+  } catch {
+    return memoryAccount
+  }
+}
+
+function writeAccount(account: CartAccount | null) {
+  memoryAccount = account
+  try {
+    if (account) window.localStorage.setItem(ACCOUNT_KEY, JSON.stringify(account))
+    else window.localStorage.removeItem(ACCOUNT_KEY)
+  } catch {
+    // Same as the lines: the in-memory value still works for this page view.
+  }
+}
+
+/**
+ * `source` is 'shopper' for changes made on this page and 'account' when the
+ * bag is swapped for an account's saved bag. Only shopper changes are marked
+ * unsaved (the flag is stored, so it survives a reload before the save lands).
+ */
+function writeLines(lines: CartLine[], source: 'shopper' | 'account' = 'shopper') {
   cachedLines = lines.filter((line) => line.quantity > 0)
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(cachedLines))
   } catch {
     // Storage can be unavailable (private mode, quota). The cart still works for this page view.
+  }
+  if (source === 'shopper') {
+    const account = readAccount()
+    if (account && !account.unsaved) writeAccount({ ...account, unsaved: true })
+    shopperChangeListeners.forEach((listener) => listener())
   }
   listeners.forEach((listener) => listener())
 }
@@ -118,5 +162,33 @@ export const cartStore = {
 
   clear() {
     writeLines([])
+  },
+
+  /** The account this bag belongs to, or null for a guest bag. */
+  getAccount: readAccount,
+
+  /** Swaps in an account's saved bag, e.g. after signing in. Not counted as a shopper change. */
+  loadAccountBag(userId: string, lines: CartLine[], { unsaved = false } = {}) {
+    writeAccount({ userId, unsaved })
+    writeLines(lines, 'account')
+  },
+
+  /** Clears the unsaved flag once `lines` reached the account, unless the bag changed again meanwhile. */
+  markSaved(userId: string, lines: CartLine[]) {
+    if (readAccount()?.userId === userId && readLines() === lines) writeAccount({ userId, unsaved: false })
+  },
+
+  /** Empties this browser's bag and detaches it from the account (sign-out). The account keeps its copy. */
+  forgetAccount() {
+    writeAccount(null)
+    writeLines([], 'account')
+  },
+
+  /** Runs after each change the shopper makes in this tab (not other tabs, not account loads). */
+  onShopperChange(listener: () => void) {
+    shopperChangeListeners.add(listener)
+    return () => {
+      shopperChangeListeners.delete(listener)
+    }
   },
 }

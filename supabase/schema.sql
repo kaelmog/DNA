@@ -324,6 +324,18 @@ create table if not exists public.rate_limits (
   hits              integer not null default 0
 );
 
+-- 3.17 Saved shopping bags: one row per variant in a signed-in customer's bag.
+-- Guests keep their bag in the browser only; it is merged in here when they sign in.
+-- Prices are never stored: the bag and checkout always read live prices.
+create table if not exists public.cart_items (
+  user_id    uuid not null default auth.uid() references public.profiles (id) on delete cascade,
+  variant_id uuid not null references public.product_variants (id) on delete cascade,
+  quantity   integer not null check (quantity between 1 and 10), -- MAX_CART_QUANTITY in lib/constants.ts
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (user_id, variant_id)
+);
+
 
 -- -----------------------------------------------------------------------------
 -- 4. Indexes
@@ -337,6 +349,7 @@ create index if not exists products_search_idx           on public.products usin
 create index if not exists product_images_product_idx    on public.product_images (product_id, position);
 create index if not exists product_variants_product_idx  on public.product_variants (product_id, position);
 create index if not exists wishlist_items_product_idx    on public.wishlist_items (product_id);
+create index if not exists cart_items_variant_idx        on public.cart_items (variant_id);
 create index if not exists reviews_product_status_idx    on public.reviews (product_id, status);
 create index if not exists reviews_user_idx              on public.reviews (user_id);
 create index if not exists orders_user_idx               on public.orders (user_id, created_at desc);
@@ -361,7 +374,8 @@ declare
 begin
   foreach t in array array[
     'profiles', 'categories', 'products', 'product_variants', 'reviews',
-    'discount_codes', 'orders', 'custom_requests', 'newsletter_subscribers', 'store_settings'
+    'discount_codes', 'orders', 'custom_requests', 'newsletter_subscribers', 'store_settings',
+    'cart_items'
   ] loop
     execute format('drop trigger if exists set_updated_at on public.%I', t);
     execute format(
@@ -766,6 +780,39 @@ begin
 end;
 $$;
 
+-- 10.5 Replace the signed-in customer's saved bag in one transaction.
+-- p_items: [{ "variant_id": uuid, "quantity": int }] with unique variant ids.
+-- Runs with the caller's rights, so RLS keeps it to their own rows. Variants
+-- that no longer exist (or are hidden from the shopper) are skipped.
+create or replace function public.save_cart(p_items jsonb)
+returns void
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  v_user_id uuid := (select auth.uid());
+begin
+  if v_user_id is null then
+    raise exception 'NOT_SIGNED_IN';
+  end if;
+
+  delete from public.cart_items c
+  where c.user_id = v_user_id
+    and not exists (
+      select 1 from jsonb_array_elements(p_items) i
+      where (i ->> 'variant_id')::uuid = c.variant_id
+    );
+
+  insert into public.cart_items (user_id, variant_id, quantity)
+  select v_user_id, v.id, (i ->> 'quantity')::integer
+  from jsonb_array_elements(p_items) i
+  join public.product_variants v on v.id = (i ->> 'variant_id')::uuid
+  on conflict (user_id, variant_id) do update
+    set quantity = excluded.quantity;
+end;
+$$;
+
 
 -- -----------------------------------------------------------------------------
 -- 11. Views (security_invoker = the caller's RLS applies)
@@ -867,6 +914,7 @@ alter table public.newsletter_subscribers enable row level security;
 alter table public.store_settings         enable row level security;
 alter table public.stripe_events          enable row level security; -- no policies: server only
 alter table public.rate_limits            enable row level security; -- no policies: server only
+alter table public.cart_items             enable row level security;
 
 -- Profiles ---------------------------------------------------------------------
 drop policy if exists "profiles_select_own_or_admin" on public.profiles;
@@ -947,6 +995,28 @@ create policy "wishlist_insert_own" on public.wishlist_items
 
 drop policy if exists "wishlist_delete_own" on public.wishlist_items;
 create policy "wishlist_delete_own" on public.wishlist_items
+  for delete to authenticated
+  using (user_id = (select auth.uid()));
+
+-- Saved shopping bags (each customer sees and edits only their own) ---------------
+drop policy if exists "cart_items_select_own" on public.cart_items;
+create policy "cart_items_select_own" on public.cart_items
+  for select to authenticated
+  using (user_id = (select auth.uid()));
+
+drop policy if exists "cart_items_insert_own" on public.cart_items;
+create policy "cart_items_insert_own" on public.cart_items
+  for insert to authenticated
+  with check (user_id = (select auth.uid()));
+
+drop policy if exists "cart_items_update_own" on public.cart_items;
+create policy "cart_items_update_own" on public.cart_items
+  for update to authenticated
+  using (user_id = (select auth.uid()))
+  with check (user_id = (select auth.uid()));
+
+drop policy if exists "cart_items_delete_own" on public.cart_items;
+create policy "cart_items_delete_own" on public.cart_items
   for delete to authenticated
   using (user_id = (select auth.uid()));
 
@@ -1099,6 +1169,8 @@ grant execute on function public.check_rate_limit(text, integer, integer)  to se
 
 revoke execute on function public.admin_dashboard(integer) from public, anon;
 grant execute on function public.admin_dashboard(integer)  to authenticated;
+revoke execute on function public.save_cart(jsonb)         from public, anon;
+grant execute on function public.save_cart(jsonb)          to authenticated;
 grant execute on function public.is_admin()                to anon, authenticated;
 
 

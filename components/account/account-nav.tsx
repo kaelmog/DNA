@@ -45,7 +45,7 @@ export function AccountNav() {
                 )}
               >
                 <Icon className="size-4" aria-hidden="true" />
-                {label}.
+                {label}
               </Link>
             </li>
           );

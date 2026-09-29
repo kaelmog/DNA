@@ -9,6 +9,7 @@ import {
   DISCOUNT_CODE_PATTERN,
   MAX_CHECKOUT_LINES,
   MAX_ORDER_NOTE_LENGTH,
+  MAX_SAVED_CART_LINES,
   normalizeDiscountCode,
   PHONE_PATTERN,
 } from '@/lib/checkout/rules'
@@ -95,6 +96,11 @@ export function manualOrderFieldErrors(error: z.ZodError): Record<string, string
   }
   return fieldErrors
 }
+
+/** A signed-in shopper's bag as sent for saving to their account (see saveAccountCart). */
+export const savedCartSchema = z
+  .array(z.object({ variantId: uuidField, quantity: z.number().int().min(1).max(MAX_CART_QUANTITY) }))
+  .max(MAX_SAVED_CART_LINES)
 
 /** Cart refresh input: keep only well-formed ids (anything else is treated as "not found"). */
 export function sanitizeVariantIds(value: unknown): string[] {
